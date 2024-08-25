@@ -69,7 +69,7 @@ class PromptGenerator:
         
         return res
     
-    def multi_thread_response(self, raw_input: str)->dict:
+    def multi_thread_response(self, raw_input: str)->tuple[dict, dict]:
         self.result_dict = {}
         self.full_process = {}
         
@@ -94,19 +94,19 @@ class ResponseThread(threading.Thread):
         self.generator = generator
  
     def run(self):
-        print(f"风格[{self.style}]开始", self.name)
+        print(f"元素[{self.style}]开始", self.name)
         res = self.generator.multi_turn_response(self.raw_input, self.style, self.prompt_list)
         self.generator.Lock.acquire()
         self.generator.result_dict[self.style] = res
         self.generator.Lock.release()
         
     def __del__(self):
-        print(f"风格[{self.style}]结束", self.name)
+        print(f"元素[{self.style}]结束", self.name)
 
 
 
 if __name__=="__main__":
-    
+    t1 = time.time()
     with open("/home/roo/dream/wutr/mprompt-encoder/config/templates.yml", 'r') as f:
         data = yaml.load(f, Loader=yaml.FullLoader)
     styles = data['styles']
@@ -114,5 +114,21 @@ if __name__=="__main__":
     sys_ins = data['sys_ins']
     gener = PromptGenerator(api_set, styles, sys_ins)
     res, his = gener.multi_thread_response("一个红色的苹果")
-    print(res.keys())
-    print(his)
+    # print(res.keys())
+    # print(his)
+    print("最终结果\n")
+    for k, v in res.items():
+        print(f"元素: {k}")
+        print(v)
+        print('\n')
+    
+    print("中间过程\n")
+    for k, v in his.items():
+        print(f"元素: {k}")
+        for i, s in enumerate(v):
+            print(f"turn {i+1}:")
+            print(f"prompt:\n{s[f'turn {i+1}']['prompt']}")
+            print(f"response:\n{s[f'turn {i+1}']['response']}")
+        print('\n')
+        
+    print(time.time()-t1)
