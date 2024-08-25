@@ -1,6 +1,7 @@
 import openai
 from openai import OpenAI
 import threading
+import yaml
 from langchain.prompts import PromptTemplate
 import time
 
@@ -169,9 +170,13 @@ class responseThread(threading.Thread):
 
 
 if __name__=="__main__":
-    get_prompt_template_dict()
-    multi_thread_response("一个红色的苹果")
-    print(result_dict)
-    print(result_dict['1'])
+    # get_prompt_template_dict()
+    # multi_thread_response("一个红色的苹果")
+    # print(result_dict)
+    # print(result_dict['1'])
     # print(style1_turn1)
+    
+    with open("/home/roo/dream/wutr/mprompt-encoder/config/templates.yml", 'r') as f:
+        data = yaml.load(f, Loader=yaml.FullLoader)
+        print(data)
     pass
