@@ -243,9 +243,17 @@ styles:
       - *s4t3
       - *s4t4
 
-api_set:
+openai_api_set:
   api_key: f2oFPKXs3EW0eJh7fhfBCTLRZtWOMym5i1vMfm7e5ENmk1DI
   base_url: https://api.f2gpt.com/v1
   model: gpt-4-turbo
+
+ollama_api_set:
+  host: '127.0.0.1'
+  port: '11434'
+  model: 'llama3.1-8b-instruct-dpo-zh' # qwen2:7b, llama3.1:8b, llama3.1-8b-instruct-dpo-zh
+  temperature: 0
+
+api_in_use: 'ollama' # openai
 
 sys_ins: 你是一个AI助手，你要完成用户给你的所有指令，不允许有差错
