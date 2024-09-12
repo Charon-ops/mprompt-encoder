@@ -1,7 +1,12 @@
 from typing import Optional, Union
-
+import os
+import math
+import time
 import numpy as np
 import torch
+import cv2
+import multiprocessing
+from multiprocessing import RLock, Queue, Process
 from diffusers import (
     AutoencoderKL,
     DDIMScheduler,
@@ -11,9 +16,12 @@ from diffusers import (
     StableDiffusionPipeline,
 )
 from diffusers.models.attention_processor import AttnProcessor2_0
-from tqdm.auto import tqdm
+from tqdm import tqdm
 from transformers import CLIPTextModel, CLIPTokenizer
 
+
+lock = RLock()
+multiprocessing.set_start_method('spawn', force=True)
 
 class MPromptSD:
     def __init__(self,
@@ -124,25 +132,14 @@ class MPromptSD:
         self,
         batch_size: int,
         generator: torch.Generator = torch.cuda.manual_seed(1002), 
-        torch_device: str = "cuda"
     ) -> torch.FloatTensor:
-        """
-        Generates a random latent tensor.
-
-        Args:
-            generator (Optional[torch.Generator], optional): Generator for random number generation. Defaults to None.
-            torch_device (str, optional): Device to store the tensor. Defaults to "cpu".
-
-        Returns:
-            torch.FloatTensor: Random latent tensor.
-        """
         channel = self.unet.config.in_channels
         height = self.unet.config.sample_size
         width = self.unet.config.sample_size
         latent = torch.randn(
             (batch_size, channel, height, width),
             generator=generator,
-            device=torch_device,
+            device=self.torch_device,
         )
         
         return latent
@@ -192,9 +189,9 @@ class MPromptSD:
         s = 0 # stages cnt
         stage_emb = emb[:, s, :, :]
         # print("stage ", stage_emb.shape)
-        print(f"generate {batch_size} images, inference steps {num_inference_steps}")
-        for t in tqdm(self.scheduler.timesteps):
-        # for t in self.scheduler.timesteps:
+        # print(f"generate {batch_size} images, inference steps {num_inference_steps}")
+        # for t in tqdm(self.scheduler.timesteps):
+        for t in self.scheduler.timesteps:
             latent_model_input = self.scheduler.scale_model_input(latents, timestep=t)
             with torch.no_grad():
                 # Predict the noise residual
@@ -228,4 +225,154 @@ class MPromptSD:
         images = (images.permute(0, 2, 3, 1) * 255).to(torch.uint8).cpu().numpy()
         return images
     
+    
+class MultiProcessSD:
+    def __init__(self,
+                 model_name: str,
+                 scheduler_name: str = "unipc",
+                 frozen: bool = True,
+                 guidance_scale: float = 7.5,
+                 ):
+        assert torch.cuda.is_available(), "No CUDA-enabled device found."
+        self.cuda_cnt = torch.cuda.device_count()
+        self.model_name = model_name
+        self.scheduler_name = scheduler_name
+        self.frozen = frozen
+        self.guidance_scale = guidance_scale
+        pass
+    
+    def split_prompt_list(
+        self, 
+        prompt_list: list[str],
+        num_per_group: int,
+        raw_prompt_list: list[str]
+    ) -> list[list]:
+        # check
+        assert isinstance(prompt_list, list), "prompt_list must be list[str]"
+        assert len(prompt_list) % num_per_group == 0, "Error in split prompt group"
+        assert len(raw_prompt_list) * num_per_group == len(prompt_list), "Error in raw_prompt_list"
+        
+        num_group = len(prompt_list) // num_per_group
+        num_per_cuda = num_group // self.cuda_cnt
+        prompts: list[list] = []
+        raw_prompts: list[list] = []
+        for i in range(0, self.cuda_cnt):
+            idx = i*num_per_cuda*num_per_group
+            prompts.append(
+                prompt_list[idx: idx+num_per_cuda*num_per_group]
+            )
+            raw_prompts.append(
+                raw_prompt_list[i*num_per_cuda: (i+1)*num_per_cuda]
+            )
+            
+        res = num_group % self.cuda_cnt
+        if res > 0:
+            res = num_group - res
+            # 多的尽量均匀分
+            for i, j in enumerate(range(res, num_group)):
+                idx = j*num_per_group
+                prompts[i] += prompt_list[idx: idx+num_per_group]
+                raw_prompts[i] += raw_prompt_list[j: j+1]
+                    
+        return prompts, raw_prompts
+        
+    def run(
+        self, 
+        prompt_list: list[str],
+        raw_prompt_list: list[str],
+        **kwargs,
+    ):
+        prompts, raw_prompts = self.split_prompt_list(
+            prompt_list,
+            kwargs['num_per_group'],
+            raw_prompt_list,
+        )
+        
+        print(f'父进程 {os.getpid()}')
+        processes = []
+        
+        for idx in range(self.cuda_cnt):
+            kwds = kwargs
+            kwds['prompt'] = prompts[idx]
+            kwds['raw_prompt'] = raw_prompts[idx]
+            kwds['cuda_index'] = idx
+            p = Process(target=sd_process_sub, args=(kwds,))
+            p.start()
+            processes.append(p)
+        
+        while True:
+            if all(p.exitcode is not None for p in processes):
+                break
+            
+        # 确保所有进程完成
+        for p in processes:
+            p.join()
+        
+def sd_process_sub(arg_dict: dict):
+    sd_process(**arg_dict)
+    
+        
+def sd_process(
+    prompt: list[str],
+    num_per_group: int = 4,
+    negative_prompt: str = "",
+    raw_prompt: list[str] = [""],
+    latents: Optional[torch.FloatTensor] = None,
+    steps_list: Optional[list[int]] = None,
+    num_inference_steps: int = 50,
+    guidance_scale: float = 7.5,
+    batch_size: int = 1,
+    cuda_index: int = 0,
+    save_path: str = "./",
+    model_name: str = "./",
+    scheduler_name: str = "unipc",
+    frozen: bool = True,
+):
+    num_group = len(prompt) // num_per_group
+    num_batch = num_group // batch_size
+    res_group = num_group % batch_size
+    prompt_list: list[list[str]] = []
+    for i in range(num_batch):
+        idx = i*num_per_group*batch_size
+        prompt_list.append(
+            prompt[idx: idx+num_per_group*batch_size]
+        )
+    if res_group > 0:
+        # 多的单独一个batch
+        prompt_list.append(prompt[-res_group*num_per_group:])
+        
+    pro_bar = tqdm(prompt_list, ncols=100, 
+                    desc=f"CUDA {cuda_index} pid {os.getpid()}",
+                    delay=0.1,
+                    position=cuda_index, 
+                    ascii=False
+                    )
+    lock.acquire()
+    sd_model = MPromptSD(model_name,
+                         scheduler_name,
+                         frozen,
+                         guidance_scale,
+                        )
+    lock.release()
+    
+    device = torch.device(f'cuda:{cuda_index}')
+    sd_model.to(device)
+    
+    print(f"Starting CUDA {cuda_index}")
+
+    img_idx = 0
+    for prompts in pro_bar:
+        imgs = sd_model.mprompt_generate(prompts,
+                                    num_per_group=num_per_group,
+                                    negative_prompt=negative_prompt,
+                                    latents=latents,
+                                    steps_list=steps_list,
+                                    num_inference_steps=num_inference_steps,
+                                    guidance_scale=guidance_scale,
+                                    )
+        for i, j in enumerate(range(img_idx, img_idx+imgs.shape[0])):
+            cv2.imwrite(os.path.join(save_path, f'{raw_prompt[j]}.png'),
+                        cv2.cvtColor(imgs[i], cv2.COLOR_BGR2RGB))
+        img_idx += imgs.shape[0]
+    pro_bar.close()
     

@@ -17,9 +17,8 @@ def my_process(process_name):
 def image_process():
     for i in range(1000):
         time.sleep(0.1)
-
-
-if __name__ == '__main__':
+        
+def run():
     print(f'父进程 {os.getpid()}')
     freeze_support()
     pro_num = 3
@@ -30,3 +29,17 @@ if __name__ == '__main__':
     
     p.close()
     p.join()
+
+
+if __name__ == '__main__':
+    # print(f'父进程 {os.getpid()}')
+    # freeze_support()
+    # pro_num = 3
+    # # 多行显示，需要设定tqdm中全局lock
+    # p = Pool(pro_num , initializer=tqdm.set_lock, initargs=(RLock(),))
+    # for idx in range(pro_num ):
+    #     p.apply_async(my_process, kwds={"process_name": idx})
+    
+    # p.close()
+    # p.join()
+    run()
