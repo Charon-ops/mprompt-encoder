@@ -9,11 +9,7 @@ if __name__ == "__main__":
     plist = [str(i) for i in range(400)]
     rlist = [str(i) for i in range(100)]
     negative_prompt = "monochrome, lowres, bad anatomy, worst quality, low quality"
-    test = MultiProcessSD(
-        model_name="/home/roo/dream/wutr/SD-exp/stable-diffusion-v1-4",
-        guidance_scale=10.0,
-        scheduler_name="unipc",
-        )
+    test = MultiProcessSD()
     set_dict = {"num_per_group": 4,
                 "negative_prompt": negative_prompt, 
                 "num_inference_steps": 20,

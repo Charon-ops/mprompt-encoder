@@ -131,7 +131,7 @@ class MPromptSD:
     def prepare_latents(
         self,
         batch_size: int,
-        generator: torch.Generator = torch.cuda.manual_seed(1002), 
+        generator: torch.Generator = torch.cuda.manual_seed(42), 
     ) -> torch.FloatTensor:
         channel = self.unet.config.in_channels
         height = self.unet.config.sample_size
@@ -150,7 +150,7 @@ class MPromptSD:
         num_per_group: int = 4,
         negative_prompt: str = "",
         latents: Optional[torch.FloatTensor] = None,
-        steps_list: list[int] = None,
+        step_list: list[int] = None,
         num_inference_steps: int = 50,
         guidance_scale: float = 7.5,
     ) -> np.ndarray:
@@ -159,13 +159,13 @@ class MPromptSD:
             assert len(prompt) % num_per_group == 0, "Error in split prompt group"
         
         # Prepare time steps
-        if steps_list is None:
+        if step_list is None:
             num = num_inference_steps
             num_p = num_per_group
-            steps_list = [num//num_p]*(num_p-1) + [num-num//num_p*(num_p-1)]
+            step_list = [num//num_p]*(num_p-1) + [num-num//num_p*(num_p-1)]
         else:
-            assert len(steps_list) == num_per_group, "Error in split prompt group"
-            num_inference_steps = sum(steps_list)
+            assert len(step_list) == num_per_group, "Error in split prompt group"
+            num_inference_steps = sum(step_list)
         self.scheduler.set_timesteps(num_inference_steps)
         
         # Encode input prompt
@@ -210,7 +210,7 @@ class MPromptSD:
             # compute the previous noisy sample x_t -> x_t-1
             latents = self.scheduler.step(noise_pred, t, latents).prev_sample
             i += 1
-            if i == steps_list[s]:
+            if i == step_list[s]:
                 i = 0
                 s += 1
                 if s >= num_per_group:
@@ -227,19 +227,9 @@ class MPromptSD:
     
     
 class MultiProcessSD:
-    def __init__(self,
-                 model_name: str,
-                 scheduler_name: str = "unipc",
-                 frozen: bool = True,
-                 guidance_scale: float = 7.5,
-                 ):
+    def __init__(self):
         assert torch.cuda.is_available(), "No CUDA-enabled device found."
         self.cuda_cnt = torch.cuda.device_count()
-        self.model_name = model_name
-        self.scheduler_name = scheduler_name
-        self.frozen = frozen
-        self.guidance_scale = guidance_scale
-        pass
     
     def split_prompt_list(
         self, 
@@ -318,7 +308,7 @@ def sd_process(
     negative_prompt: str = "",
     raw_prompt: list[str] = [""],
     latents: Optional[torch.FloatTensor] = None,
-    steps_list: Optional[list[int]] = None,
+    step_list: Optional[list[int]] = None,
     num_inference_steps: int = 50,
     guidance_scale: float = 7.5,
     batch_size: int = 1,
@@ -366,12 +356,13 @@ def sd_process(
                                     num_per_group=num_per_group,
                                     negative_prompt=negative_prompt,
                                     latents=latents,
-                                    steps_list=steps_list,
+                                    step_list=step_list,
                                     num_inference_steps=num_inference_steps,
                                     guidance_scale=guidance_scale,
                                     )
         for i, j in enumerate(range(img_idx, img_idx+imgs.shape[0])):
-            cv2.imwrite(os.path.join(save_path, f'{raw_prompt[j]}.png'),
+            img_name = raw_prompt[j].replace("\n", "")
+            cv2.imwrite(os.path.join(save_path, f'{img_name}.png'),
                         cv2.cvtColor(imgs[i], cv2.COLOR_BGR2RGB))
         img_idx += imgs.shape[0]
     pro_bar.close()
