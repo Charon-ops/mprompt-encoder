@@ -3,6 +3,7 @@ from openai import OpenAI
 import ollama
 import threading
 import yaml
+from typing import Optional, Union
 from langchain.prompts import PromptTemplate
 import time
 
@@ -69,44 +70,67 @@ class PromptGenerator:
         )
         
     
-    def single_response_openai(self, prompt: str)->str:
+    def single_response_openai(self, prompt: str, max_new_tokens: Optional[int]=None)->str:
         client = OpenAI(
             api_key=self.api_key,
             base_url=self.base_url,
         )
-    
-        completion = client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": self.sys_ins},
-                {"role": "user", "content": prompt}
-            ]
-        )
+        if max_new_tokens is None:
+            completion = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": self.sys_ins},
+                    {"role": "user", "content": prompt}
+                ],
+                options={"temperature": self.temperature}
+            )
+        else:
+            completion = client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": self.sys_ins},
+                    {"role": "user", "content": prompt}
+                ],
+                options={"temperature": self.temperature, "max_new_tokens": max_new_tokens}
+            )
         return completion.choices[0].message.content
     
-    def single_response_ollama(self, prompt: str)->str:
+    def single_response_ollama(self, prompt: str, max_new_tokens: Optional[int]=None)->str:
         client = ollama.Client(
             host=f"http://{self.host}:{self.port}"
         )
-    
-        res = client.chat(
-            model=self.model,
-            stream=False,
-            messages=[
-                {"role": "system", "content": self.sys_ins},
-                {"role": "user", "content": prompt}
-            ],
-            options={"temperature": self.temperature}
-        )
+        if max_new_tokens is None:
+            res = client.chat(
+                model=self.model,
+                stream=False,
+                messages=[
+                    {"role": "system", "content": self.sys_ins},
+                    {"role": "user", "content": prompt}
+                ],
+                options={"temperature": self.temperature}
+            )
+        else:
+            res = client.chat(
+                model=self.model,
+                stream=False,
+                messages=[
+                    {"role": "system", "content": self.sys_ins},
+                    {"role": "user", "content": prompt}
+                ],
+                options={"temperature": self.temperature, "max_new_tokens": max_new_tokens}
+            )
         return res['message']['content']
     
     def multi_turn_response_openai(self, raw_input: str, style_name: str, prompt_list: list[PromptTemplate])->str:
         input_var = {'input': raw_input}
         self.full_process[style_name] = []
-        
+        length = len(prompt_list)
         for i, temp in enumerate(prompt_list):
             prompt = temp.format(**input_var)
-            res = self.single_response_openai(prompt)
+            if i < length-1:
+                res = self.single_response_openai(prompt)
+            else:
+                res = self.single_response_openai(prompt, 77)
             input_var = {'input': res}
             
             self.full_process[style_name].append(
@@ -118,10 +142,13 @@ class PromptGenerator:
     def multi_turn_response_ollama(self, raw_input: str, style_name: str, prompt_list: list[PromptTemplate])->str:
         input_var = {'input': raw_input}
         self.full_process[style_name] = []
-        
+        length = len(prompt_list)
         for i, temp in enumerate(prompt_list):
             prompt = temp.format(**input_var)
-            res = self.single_response_ollama(prompt)
+            if i < length-1:
+                res = self.single_response_ollama(prompt)
+            else:
+                res = self.single_response_ollama(prompt, 77)
             input_var = {'input': res}
             
             self.full_process[style_name].append(

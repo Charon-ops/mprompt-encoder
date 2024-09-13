@@ -42,6 +42,7 @@ class  MultiThreadPrompt(threading.Thread):
             lock.acquire()
             dict2jsonl(res, output_path)
             lock.release()
+        pro_bar.close()
         
 
 
