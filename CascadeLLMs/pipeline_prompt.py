@@ -50,15 +50,16 @@ class  MultiThreadPrompt(threading.Thread):
 if __name__=="__main__":
     # t1 = time.time()
     prompt_path = '../prompt'
-    output_path = '../prompt/T2I_val.json'
+    output_path = '../prompt/T2I_val.jsonl'
     raw_prompts = []
     prompt_list = []
     files = os.listdir(prompt_path)
     
     # read all raw prompts
     for file in files:
-        path = os.path.join(prompt_path, file)
-        raw_prompts += get_raw_prompts(path)
+        if file.endswith('.txt'):
+            path = os.path.join(prompt_path, file)
+            raw_prompts += get_raw_prompts(path)
     
     # split by cuda num
     num_cuda = torch.cuda.device_count()
@@ -69,40 +70,32 @@ if __name__=="__main__":
     if res > 0:
         for i, j in enumerate(raw_prompts[-res:]):
             prompt_list[i] += j
-    
     # load cfg
     with open("../config/templates_en_new.yml", 'r') as f:
         data = yaml.load(f, Loader=yaml.FullLoader)
-    styles = data['styles']
-    summary = data['summary']
-    api_in_use = data['api_in_use']
+    # styles = data['styles']
+    # summary = data['summary']
+    # api_in_use = data['api_in_use']
     ollama_api_set = data['ollama_api_set']
-    openai_api_set = data['openai_api_set']
-    sys_ins = data['sys_ins']
+    # openai_api_set = data['openai_api_set']
+    # sys_ins = data['sys_ins']
+    
+    kwds = {}
+    kwds['styles'] = data['styles']
+    kwds['summary'] = data['summary']
+    kwds['api_in_use'] = data['api_in_use']
+    kwds['ollama_api_set'] = data['ollama_api_set']
+    kwds['openai_api_set'] = data['openai_api_set']
+    kwds['sys_ins'] = data['sys_ins']
     
     # multi thread
     threads = []
     port = int(ollama_api_set['port'])
+    print("Generating Prompts")
     for i in range(num_cuda):
-        print(f"Starting CUDA {i}")
         ollama_api_set['port'] = str(port+i)
-        tmp_thread = MultiThreadPrompt(i,
-                                       prompt_list[i],
-                                       api_in_use, 
-                                       openai_api_set, 
-                                       ollama_api_set, 
-                                       styles, 
-                                       summary, 
-                                       sys_ins
-                                       )
+        tmp_thread = MultiThreadPrompt(i, prompt_list[i], **kwds)
         tmp_thread.start()
         threads.append(tmp_thread)
     for t in threads:
         t.join()
-        
-    
-    # gener = PromptGenerator(api_in_use, openai_api_set, ollama_api_set, styles, summary, sys_ins)
-
-    
-        
-    # print(time.time()-t1)

@@ -5,17 +5,17 @@ sd_config:
   scheduler_name: unipc
   frozen: True
   num_per_group: 4 # num prompts per group
-  batch_size: 2 # num imgs per batch
+  batch_size: 4 # num imgs per batch
   step_list: # will cover num_inference_steps
-    - 5
     - 10
-    - 15
+    - 10
+    - 10
     - 20
   num_inference_steps: 50
   negative_prompt: monochrome, lowres, bad anatomy, worst quality, low quality
   save_path: ./test_imgs
 
-prompt_path: /home/roo/dream/wutr/SD-exp/mprompt-encoder/CascadeLLMs/test2.jsonl
+prompt_path: ./prompt/T2I_val.jsonl
 step_describe:
   - visual_center
   - composition

@@ -1,7 +1,7 @@
 # test
 *log
 *log.txt
-test_imgs/
+# test_imgs/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

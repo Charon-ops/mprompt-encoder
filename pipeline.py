@@ -6,7 +6,7 @@ from mprompt_sd import MPromptSD, MultiProcessSD
 
 
 def get_prompt_list(path: str, 
-                    step_d: list[str]
+                    step_describe: list[str]
                     )->tuple[list, list]:
     prompt_list = []
     raw_prompt_list = []

@@ -13,7 +13,7 @@ class PromptGenerator:
                  api_in_use: str,
                  openai_api_set: dict,
                  ollama_api_set: dict, 
-                 style_template: list[dict],
+                 styles: list[dict],
                  summary: str,
                  sys_ins: str):
         
@@ -30,7 +30,7 @@ class PromptGenerator:
         elif api_in_use =="ollama":
             self.init_ollama_api(ollama_api_set)
             
-        self.load_style_template(style_template)
+        self.load_style_template(styles)
         self.load_summary_template(summary)
     
     def init_openai_api(self, api_set: dict):
@@ -91,7 +91,7 @@ class PromptGenerator:
                     {"role": "system", "content": self.sys_ins},
                     {"role": "user", "content": prompt}
                 ],
-                options={"temperature": self.temperature, "max_new_tokens": max_new_tokens}
+                options={"temperature": self.temperature, "num_predict": max_new_tokens}
             )
         return completion.choices[0].message.content
     
@@ -117,7 +117,7 @@ class PromptGenerator:
                     {"role": "system", "content": self.sys_ins},
                     {"role": "user", "content": prompt}
                 ],
-                options={"temperature": self.temperature, "max_new_tokens": max_new_tokens}
+                options={"temperature": self.temperature, "num_predict": max_new_tokens}
             )
         return res['message']['content']
     
@@ -193,7 +193,7 @@ class ResThreadOpenai(threading.Thread):
         self.generator = generator
  
     def run(self):
-        print(f"元素[{self.style}]开始", self.name)
+        # print(f"元素[{self.style}]开始", self.name)
         res = self.generator.multi_turn_response_openai(self.raw_input, self.style, self.prompt_list)
         self.generator.Lock.acquire()
         self.generator.result_dict[self.style] = res
@@ -213,7 +213,7 @@ class ResThreadOllama(threading.Thread):
         self.generator = generator
  
     def run(self):
-        print(f"元素[{self.style}]开始", self.name)
+        # print(f"元素[{self.style}]开始", self.name)
         res = self.generator.multi_turn_response_ollama(self.raw_input, self.style, self.prompt_list)
         self.generator.Lock.acquire()
         self.generator.result_dict[self.style] = res

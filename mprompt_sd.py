@@ -361,7 +361,7 @@ def sd_process(
                                     guidance_scale=guidance_scale,
                                     )
         for i, j in enumerate(range(img_idx, img_idx+imgs.shape[0])):
-            img_name = raw_prompt[j].replace("\n", "")
+            img_name = raw_prompt[j].replace("\n", "").replace(".", "")
             cv2.imwrite(os.path.join(save_path, f'{img_name}.png'),
                         cv2.cvtColor(imgs[i], cv2.COLOR_BGR2RGB))
         img_idx += imgs.shape[0]
