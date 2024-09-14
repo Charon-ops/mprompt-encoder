@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # port cuda
-ports=(11434 11435 11436 11437)
+ports=(11434 11435 11436 11437) # 连续
 cudas=(0 1 2 3)
 
 length=${#ports[@]}
