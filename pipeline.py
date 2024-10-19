@@ -2,7 +2,8 @@ import os
 import yaml
 import argparse
 import json
-from mprompt_sd import MPromptSD, MultiProcessSD
+from mprompt_sd1_4 import MultiProcessSD as MultiProcessSD1_4
+from mprompt_flux1 import MultiProcessFlux
 
 
 def get_prompt_list(path: str, 
@@ -50,7 +51,7 @@ if __name__ == '__main__':
     step_describe = args.__dict__["step_describe"]
     plist, rlist = get_prompt_list(prompt_path, step_describe)
     
-    pipe = MultiProcessSD()
+    pipe = MultiProcessFlux()
     # rp_list = []
     # for i in rlist:
     #     rp_list += [i]*4

@@ -1,7 +1,8 @@
 # SD config
 sd_config:
+  model: sd1.4 # sd1.4, sd3, flux1
   model_name: /home/roo/dream/wutr/SD-exp/stable-diffusion-v1-4 # path
-  guidance_scale: 10.0
+  guidance_scale: 8.5
   scheduler_name: unipc
   frozen: True
   num_per_group: 4 # num prompts per group
@@ -10,8 +11,8 @@ sd_config:
     - 10
     - 10
     - 10
-    - 20
-  num_inference_steps: 50
+    - 10
+  num_inference_steps: 40
   negative_prompt: monochrome, lowres, bad anatomy, worst quality, low quality
   save_path: ./test_imgs
 

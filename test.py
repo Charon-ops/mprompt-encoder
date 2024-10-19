@@ -1,4 +1,4 @@
-from mprompt_sd import MPromptSD, MultiProcessSD
+from mprompt_sd1_4 import MPromptSD, MultiProcessSD
 import torch
 import cv2
 import numpy as np
